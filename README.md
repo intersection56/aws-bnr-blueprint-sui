@@ -112,6 +112,8 @@ Sui publishes **separate releases per network**. The install phase downloads rel
 
 The live testnet test (2026-11-03, [test report](docs/testnet-test-report.md)) ran v1.83.0. v1.83.1 has not been deployed live yet; the configuration keys, `sui-tool` flags and `/health` logic this blueprint uses are unchanged between the two in Sui's source.
 
+> **Mainnet has not been deployed in testing.** All live testing is on testnet. Mainnet configurations are validated statically (tests and `cdk synth`), but mainnet bootstrap time, disk use against the 3,750 GB instance store (Sui reported ~2.5 TB for a pruned node with indexes in November 2025) and egress are modelled, not measured. Watch `/data` usage and the first bootstrap closely on a first mainnet deployment.
+
 What the configuration provides:
 
 - `rpc.enable-indexing: true`: gRPC indexes for owned objects, balances and the ledger-history list APIs.
@@ -735,6 +737,7 @@ Bare metal is cheaper because bandwidth is included and you get more physical co
 - **Least privilege.** sui-node and sui-tool run as `bcuser`, not root, with `NoNewPrivileges=true`.
 - **No secrets.** A full node holds no funds or validator keys. `fullnode.yaml` contains no credentials. Mainnet archival fallback uses the instance role, never access keys.
 - No SSH. Use AWS Systems Manager Session Manager.
+- **Scanned before publishing.** gitleaks (secrets, full history) and ASH (10 scanners, including semgrep, checkov, detect-secrets and cfn-nag) found nothing on the first commit; earlier findings were fixed. See the [security scan report](docs/security-scan-report.md). Live testing is in the [testnet test report](docs/testnet-test-report.md).
 
 ## FAQ
 

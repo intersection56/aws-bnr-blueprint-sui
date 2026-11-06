@@ -186,4 +186,4 @@ To be reported upstream:
 - In-place upgrades (`scripts/upgrade-in-place.sh`) and the never-downgrade safeguard, added after this test.
 - The stack-level lag metric and alarm, added after this test.
 - Amazon Inspector and CIS Ubuntu benchmark on a live node.
-- Mainnet: bootstrap time, disk use (~2.5 TB pruned with indexes per Sui, Nov 2025, on 3,750 GB) and egress are modelled, not measured.
+- Mainnet: bootstrap time, disk use (~2.5 TB pruned with indexes per Sui, Nov 2025, on 3,750 GB) and egress are modelled, not measured. Mainnet is not part of the pre-publish release test (testnet only); the HA sample's 24-hour grace period is an estimate for mainnet.

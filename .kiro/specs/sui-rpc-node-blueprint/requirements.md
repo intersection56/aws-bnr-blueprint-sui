@@ -247,7 +247,7 @@ Decisions behind these requirements are recorded as ADRs in `docs/adr/`. Status 
 1. BEFORE publishing THE Owner SHALL deploy the testnet sample for at least one day and record the results in `docs/testnet-test-report.md`.
 2. THE test SHALL show: setup completes, `node.service` stays active with no restart loop, checkpoints advance, `/health` returns 200, RPC is not reachable from the internet, and `c1_*` metrics appear in CloudWatch.
 3. THE test SHALL measure snapshot restore time, index build time, `/data` usage, `NetworkOut`, peer count, CloudWatch metric count and log volume, and these SHALL replace the corresponding assumptions in the README.
-4. BEFORE publishing THE final release test SHALL cover, on the published version: a fresh single-node deploy with a live stop/start and a plain reboot; an in-place upgrade followed by a stop/start that keeps the newer release; a 3-node HA deployment on testnet including loss of one node; a mainnet single-node deployment measuring bootstrap time, disk use and egress; and the lag alarm (Owner decision 2026-11-05).
+4. BEFORE publishing THE final release test SHALL cover, on the published version: a fresh single-node deploy with a live stop/start and a plain reboot; an in-place upgrade followed by a stop/start that keeps the newer release; a 3-node HA deployment on testnet including loss of one node; and the lag alarm. Mainnet is not deployed before publishing (Owner decision 2026-11-05), so THE README SHALL state that mainnet bootstrap time, disk use and egress are modelled, not measured.
 
 ## Open questions for the Owner
 
@@ -269,4 +269,4 @@ Answered 2026-11-05 (decisions by the Owner unless marked; reasoning in ADRs 001
    the release test (not yet confirmed by the Owner).
 7. **Supported regions:** us-east-1 tested; North American regions recommended by default, because Mysten Labs' free
    formal-snapshot bucket is in North America only (agent recommendation from Mysten's docs).
-8. **Release test scope** (added): single node, HA and mainnet.
+8. **Release test scope** (added): testnet only, single node and 3-node HA (scenario A). Mainnet is not tested before publishing (Owner decision 2026-11-05).
