@@ -38,3 +38,11 @@ the replacements would turn a halt into a longer outage. Replacing a node also d
 - One extra CloudWatch metric per stack ($0.30/month) plus $0.10/month per alarm.
 - `--treat-missing-data notBreaching` keeps the alarm quiet during bootstrap; a node that stops publishing entirely is
   covered in HA by an `UnHealthyHostCount` alarm, not this one.
+- **Updated 2026-11-06 (release test, issue 5):** the alarm needs 5-minute periods (`--period 300 --evaluation-periods 2
+  --datapoints-to-alarm 2`). With 1-minute periods it returned to OK while a node was ~78,000 s behind, because the sync
+  checker runs every 60-90 s and some minutes had no sample from the lagging node. Also, nodes publish the stack metric
+  during the post-bootstrap catch-up (not during restore and index build), so the alarm fires while a new node catches
+  up; that is correct, because plain `/health` already routes traffic to it. Verified live: the corrected alarm fired
+  ~8 minutes after a node's P2P was blocked and cleared ~6 minutes after it caught up; plain `/health` stayed 200 (and
+  the target healthy) throughout, confirming the freshness gap this ADR describes.
+

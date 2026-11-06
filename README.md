@@ -81,7 +81,7 @@ aws-bnr-blueprint-sui/
 
 #### What HA gives you, and what it doesn't
 
-HA mode has not yet been deployed in a live test (planned for the release test). The blueprint makes no availability promise.
+HA was tested live on testnet with 3 nodes on 2026-11-06: a reboot, a node cut off from its peers, and a node terminated and replaced, with the load balancer serving throughout ([test report](docs/testnet-test-report.md#release-test-2026-11-06)). A rolling upgrade and mainnet HA have not been tested. The blueprint makes no availability promise.
 
 **It protects against:**
 - **Loss of one node or its disk** (hardware failure, host retirement, instance-store loss, a stopped instance): the other nodes keep serving and the Auto Scaling group launches a replacement, which bootstraps for hours.
@@ -110,7 +110,7 @@ HA mode has not yet been deployed in a live test (planned for the release test).
 
 Sui publishes **separate releases per network**. The install phase downloads release `${BC_NETWORK}-<version>` and fails if that release does not exist for the selected network. Both networks are currently on v1.83.1, so one configuration serves both; when their versions differ, each network has its own configuration file, and the samples pair each network with its own. See [Maintenance](#maintenance).
 
-The live testnet test (2026-11-03, [test report](docs/testnet-test-report.md)) ran v1.83.0. v1.83.1 has not been deployed live yet; the configuration keys, `sui-tool` flags and `/health` logic this blueprint uses are unchanged between the two in Sui's source.
+v1.83.1 was tested live on testnet on 2026-11-06 (single node and 3-node HA, [test report](docs/testnet-test-report.md#release-test-2026-11-06)); the first test (2026-11-03) ran v1.83.0.
 
 > **Mainnet has not been deployed in testing.** All live testing is on testnet. Mainnet configurations are validated statically (tests and `cdk synth`), but mainnet bootstrap time, disk use against the 3,750 GB instance store (Sui reported ~2.5 TB for a pruned node with indexes in November 2025) and egress are modelled, not measured. Watch `/data` usage and the first bootstrap closely on a first mainnet deployment.
 
@@ -507,7 +507,7 @@ grpcurl -plaintext <node-internal-ip>:9000 sui.rpc.v2.LedgerService/GetCheckpoin
 | `SUI_NUM_EPOCHS_TO_RETAIN_FOR_CHECKPOINTS` | Epochs of transactions, effects and events to keep (min `2`) | `2` |
 | `SUI_ARCHIVE_FALLBACK` | `auto`: on for testnet, off for mainnet. `true` on mainnet enables the Requester Pays S3 archive. `false` disables it. | `auto` |
 | `SUI_RUST_LOG` | `RUST_LOG` filter for sui-node | `info` |
-| `SUI_SNAPSHOT_MAX_RETRIES` | `sui-tool --max-retries`: retries per failed HTTP request during the snapshot restore | `10` |
+| `SUI_SNAPSHOT_MAX_RETRIES` | `sui-tool --max-retries`: retries per failed HTTP request during the snapshot restore, including checkpoint fetches (0-1000). The blueprint default is higher than `sui-tool`'s own (10), because with 10 most first restore attempts failed in testing (ADR-0025) | `50` |
 | `SUI_SNAPSHOT_PARALLEL_DOWNLOADS` | `sui-tool --num-parallel-downloads` (1-200). Lower it if restores time out against Sui's public endpoints | `50` |
 | `SUI_ALLOW_DOWNGRADE` | Never-downgrade safeguard. `false`: when setup re-runs after an [in-place upgrade](#single-node-in-place-upgrade), keep the newer installed release for the same network. `true`: install exactly `CLIENT_CONFIG`, to roll back on purpose | `false` |
 
@@ -590,7 +590,7 @@ sudo systemctl status amazon-cloudwatch-agent
 
 ### Lag alarm
 
-Plain `/health` does not detect a node that has stopped following the chain (see [High Availability (HA) Deployment](#high-availability-ha-deployment)), so create a CloudWatch alarm on how far behind the nodes are. Every node publishes `c1_seconds_behind` with a `StackName` dimension as well as per instance, so **one alarm per stack covers every node**, including HA replacements. Nodes only publish it once they are serving, so a node that is still bootstrapping doesn't trigger it.
+Plain `/health` does not detect a node that has stopped following the chain (see [High Availability (HA) Deployment](#high-availability-ha-deployment)), so create a CloudWatch alarm on how far behind the nodes are. Every node publishes `c1_seconds_behind` with a `StackName` dimension as well as per instance, so **one alarm per stack covers every node**, including HA replacements. Nodes don't publish it while restoring the snapshot or building indexes. They do publish it during the catch-up that follows, when the load balancer already sends them traffic (plain `/health` returns 200), so the alarm also fires while a new or replacement node catches up. That is intended: those reads are stale.
 
 ```bash
 STACK_NAME="sui-mainnet-sui-node-v-full"   # the CloudFormation stack name: sui-<network>-sui-node-v-full, with STACK_NAME_PREFIX- in front if set
@@ -598,10 +598,10 @@ TOPIC_ARN="arn:aws:sns:$AWS_REGION:$AWS_ACCOUNT_ID:your-alerts-topic"
 
 aws cloudwatch put-metric-alarm --region "$AWS_REGION" \
   --alarm-name "$STACK_NAME-sui-seconds-behind" \
-  --alarm-description "A Sui node is more than 60 s behind the chain for 5 minutes" \
+  --alarm-description "A Sui node is more than 60 s behind the chain in two consecutive 5-minute windows" \
   --namespace CWAgent --metric-name c1_seconds_behind \
   --dimensions Name=StackName,Value="$STACK_NAME" \
-  --statistic Maximum --period 60 --evaluation-periods 5 \
+  --statistic Maximum --period 300 --evaluation-periods 2 --datapoints-to-alarm 2 \
   --threshold 60 --comparison-operator GreaterThanThreshold \
   --treat-missing-data notBreaching \
   --alarm-actions "$TOPIC_ARN" --ok-actions "$TOPIC_ARN"
@@ -609,7 +609,8 @@ aws cloudwatch put-metric-alarm --region "$AWS_REGION" \
 
 - **When it fires on one node:** check that node's per-instance `c1_seconds_behind` and its logs (see [Node Not Starting](#node-not-starting)). In HA, you can take a stuck node out of rotation by deregistering it from the target group, or restart `node.service`.
 - **When it fires on every node at once:** check [status.sui.io](https://status.sui.io/) for a network halt before changing anything. Replacing nodes during a halt only adds bootstrap time.
-- `--treat-missing-data notBreaching` keeps it quiet while nodes bootstrap. It also means a node that stops publishing entirely doesn't trigger this alarm; in HA, alarm on the target group's `UnHealthyHostCount` for that case.
+- **Use 5-minute periods.** Each node's sync checker runs every 60-90 seconds, so a 1-minute period sometimes has no sample from the lagging node; its Maximum then comes only from healthy nodes, and an alarm on 1-minute periods returned to OK while a node was hours behind (release test, 2026-11-06). With 5-minute periods every window has a sample from every node. In the test this alarm fired ~8 minutes after a node was cut off from its peers, and cleared ~6 minutes after it caught up.
+- `--treat-missing-data notBreaching` keeps it quiet during the restore and index build. It also means a node that stops publishing entirely doesn't trigger this alarm; in HA, alarm on the target group's `UnHealthyHostCount` for that case.
 - The alarm costs $0.10/month; the stack-level metric adds $0.30/month.
 
 ### Health Check Failures (HA)

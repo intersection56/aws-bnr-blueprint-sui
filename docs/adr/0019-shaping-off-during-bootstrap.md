@@ -42,3 +42,7 @@ the only cause.
 - `TRAFFIC_SHAPING_ENABLED="false"` now actually means no shaping.
 - The framework's built-in Solana checker has the same early-exit pattern; this may affect other blueprints (not verified).
 - Verified in the redeploy test (2026-11-03): the restore succeeded on the first attempt (1h42m) with shaping `inactive` throughout bootstrap. Two runs with shaping off succeeded and two with it on failed: strong evidence, not a controlled experiment. Issue 3 (the checker's unit detection under `pipefail`) was found and fixed in the same test, after which shaping was enabled once in sync.
+- **Amended by ADR-0025 (2026-11-06):** the release test showed traffic shaping was not the root cause. With shaping off
+  on every node, 4 of 6 first restore attempts still failed the same way; raising `SUI_SNAPSHOT_MAX_RETRIES` to 50 let
+  3 of 3 succeed. Keeping shaping off during bootstrap stays: it is harmless and removes a variable.
+

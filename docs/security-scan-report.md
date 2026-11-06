@@ -1,7 +1,7 @@
 # Security scan report
 
-Static security scans of this blueprint before publishing. Live-instance scans (Amazon Inspector, CIS Ubuntu
-benchmark) are planned for the release test and are not covered here. Requirement 16 in
+Security scans of this blueprint before publishing: static scans, and Amazon Inspector on live testnet nodes during the
+release test. Requirement 16 in
 `.kiro/specs/sui-rpc-node-blueprint/requirements.md`; per-requirement status in `traceability.md`.
 
 ## Summary
@@ -50,7 +50,16 @@ instance metadata; no `eval`, no download-and-run, no credentials in configurati
 download directory; RPC bound to the internal IP and allowed only from the VPC; metrics and admin interfaces on
 loopback; the node runs as an unprivileged user. See the README's Security Considerations.
 
+## Live-instance scans (release test, 2026-11-06)
+
+Amazon Inspector on the 4 testnet nodes of the release test (details in `docs/testnet-test-report.md`):
+- **Network reachability:** only 8084/udp (P2P) reachable from the internet on every node; RPC, metrics and admin not
+  reachable. Matches the design.
+- **Package vulnerabilities:** 2,753 findings per node, identical on all nodes, all in the Ubuntu 24.04 image and none
+  from the blueprint: ~2,732 Linux kernel CVEs with no fix available from Ubuntu at the time, ~20 with a fix that the
+  image's enabled `unattended-upgrades` installs automatically.
+
 ## Not yet done
 
-- Amazon Inspector and the CIS Ubuntu benchmark on a live instance (release test).
+- The CIS Ubuntu benchmark: the Amazon Inspector CIS scan failed twice on these nodes.
 - A threat model.

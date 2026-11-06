@@ -1,11 +1,14 @@
 # Testnet test report
 
-Live test of this blueprint on Sui **testnet**, run on 2026-11-03 in a personal test AWS account. It is the live
+Live tests of this blueprint on Sui **testnet** in a personal test AWS account (us-east-1): a first test on
+2026-11-03, and the pre-publish **release test** on 2026-11-06 ([below](#release-test-2026-11-06)). They are the live
 verification required by requirement 18 (`.kiro/specs/sui-rpc-node-blueprint/requirements.md`); per-requirement status
-is in `traceability.md`.
+is in `traceability.md`. Mainnet was not deployed in either test.
 
-All times are UTC. All figures are point-in-time measurements from this one run, on testnet, and may differ for other
-regions, instance types, client versions or mainnet. Anything not measured is marked as such.
+All times are UTC. All figures are point-in-time measurements on testnet and may differ for other regions, instance
+types, client versions or mainnet. Anything not measured is marked as such.
+
+# First test (2026-11-03)
 
 ## Summary
 
@@ -177,7 +180,7 @@ To be reported upstream:
    lagging nodes, and replace every node during a network halt. Suggested: an option for EC2-only Auto Scaling health
    checks (keeping ELB checks for routing), or an instance maintenance policy that launches before terminating.
 
-## Not yet tested
+## Not yet tested (as of 2026-11-03)
 
 - sui-node v1.83.1, the version the blueprint now pins for both networks (this test ran v1.83.0 on testnet). The
   configuration keys, `sui-tool` flags and `/health` logic the blueprint relies on are unchanged in Sui's source.
@@ -187,3 +190,134 @@ To be reported upstream:
 - The stack-level lag metric and alarm, added after this test.
 - Amazon Inspector and CIS Ubuntu benchmark on a live node.
 - Mainnet: bootstrap time, disk use (~2.5 TB pruned with indexes per Sui, Nov 2025, on 3,750 GB) and egress are modelled, not measured. Mainnet is not part of the pre-publish release test (testnet only); the HA sample's 24-hour grace period is an estimate for mainnet.
+
+# Release test (2026-11-06)
+
+## Summary
+
+**Result: pass with issues.** Blueprint commit `0f34116` (sui-node v1.83.1), framework commit `2db9ea3`, testnet only
+(Owner decision). A single-node stack and a 3-node HA stack ran in parallel. Every functional check passed, including
+the in-place upgrade, the never-downgrade safeguard across a stop/start, the issue-2 fix on a real stop/start, HA
+failover and replacement, and the lag alarm. Two issues were found and fixed in the blueprint (issues 4 and 5); one
+check could not be completed (CIS benchmark).
+
+| | Single node | 3-node HA |
+|---|---|---|
+| Deploy (`cdk deploy`) | 4 min | 3.5 min |
+| Deploy to serving and in sync | ~4h30m (restore attempt 1 failed) | ~4 h for all 3 (2 of 3 restores failed attempt 1) |
+| In-place upgrade v1.83.0 to v1.83.1 | 1m08s total; healthy and in sync 20 s after restart | not applicable (refused by design) |
+| Stop/start to serving and in sync | ~3h30m (instance store rebuilt) | not applicable (instances are replaced) |
+| Reboot to healthy | - | 2m43s; load balancer kept serving |
+| Node lost to replacement healthy | - | ~3h30m; load balancer kept serving on 2 nodes |
+| Estimated cost (us-east-1 on-demand) | ~$15 | ~$44 |
+
+A side experiment (3 extra single nodes, ~$8) tested the fix for issue 4. Total estimated cost ~$67.
+
+## Setup
+
+| Field | Value |
+|---|---|
+| Region | us-east-1; single node pinned to us-east-1a; HA across all default-VPC public subnets |
+| Instances | `i7i.4xlarge` (x86_64, 16 vCPU, 128 GiB, 1 x 3,750 GB NVMe), standard shared-tenancy EC2, Ubuntu 24.04 (AMI built 2026-10-23) |
+| Single node | `samples/.env-testnet-sui-node-full`, `CLIENT_CONFIG` set to a **test-only** `sui-node-v1.83.0-full.sh` (a copy of the v1.83.1 file, added only to the test checkout, never committed) so an in-place upgrade to v1.83.1 could be tested before a newer testnet release existed |
+| HA | `samples/.env-testnet-sui-node-full-ha` (3 nodes, v1.83.1), `STACK_NAME_PREFIX="ha"` so both stacks could run at once |
+| Install | Blueprint installed from a clean clone of the commit into two fresh framework checkouts; installed copies checked identical to the commit |
+| Before deploying | Synthesized templates: 9000/tcp only from the VPC CIDR and the ALB security group, 8084/udp from the internet, ALB `internal`, ASG desired 3 / grace 24 h. The CDK bootstrap stack had been deleted from the account since the first test and was re-created |
+
+## Timeline
+
+| Event | Time |
+|---|---|
+| Both stacks deployed | 01:31:45-01:35:54 |
+| HA: Auto Scaling tried us-east-1e first (`i7i.4xlarge` not offered there), then launched in us-east-1a, c, d | 01:34:46-01:34:55 |
+| All 4 nodes: release downloaded and SHA-256 verified; traffic shaping inactive during bootstrap | ~01:37-01:38 |
+| Restore attempt 1 **failed** on the single node and 2 HA nodes (checkpoint fetch timeout, 26-28 min in); retried automatically | 02:04-02:06 |
+| HA1 restored on attempt 1 (1h15m); the others restored on attempt 2 (1h22m-1h50m) | 02:53-03:56 |
+| HA1 serving (load balancer healthy) while 71,943 checkpoints behind; in sync minutes later; shaping enabled once in sync | 04:34-05:00 |
+| All 3 HA nodes healthy and in sync; lag alarm back to OK | 05:36 |
+| HA: reboot of one node | 05:56-05:59 |
+| HA: P2P of one node blocked for 13.5 minutes (lag test) | 06:05-06:19 |
+| HA: one node terminated; replacement launched 1.5 min later in us-east-1a | 06:26-06:27 |
+| Single: in-place upgrade v1.83.0 to v1.83.1 | 06:33:23-06:34:31 |
+| Single: stop/start; safeguard kept v1.83.1; restore attempt 1 succeeded (1h21m) | 06:34:45-07:59 |
+| Side experiment: 3 single nodes with `SUI_SNAPSHOT_MAX_RETRIES=50`; all restored on attempt 1 | 07:13-08:44 |
+| HA replacement healthy and in sync (restore attempt 1 failed, attempt 2 succeeded) | 09:58 |
+| Single node in sync on v1.83.1 after the rebuild | 10:05 |
+| Both stacks destroyed | 10:07-10:10 |
+
+## Functional checks
+
+| Check | Result |
+|---|---|
+| Release download, SHA-256 verification, genesis pin | PASS on all 4 nodes |
+| Traffic shaping off during bootstrap; enabled once in sync (issues 1 and 3) | PASS on every node |
+| `node.service` 0 restarts, runs as `bcuser` | PASS on every node |
+| Listeners: RPC on the internal IP only; metrics and admin on 127.0.0.1; only P2P on 0.0.0.0:8084/udp | PASS on every serving node |
+| RPC, metrics and admin not reachable on public IPs (probed from outside AWS) | PASS (all time out) |
+| Amazon Inspector network reachability | PASS: only 8084/udp reachable from the internet, on every node |
+| Chain identity (`4c78adac`, testnet) and version | PASS |
+| HA: `/health` through the internal ALB | PASS (200 throughout, including during the reboot, the P2P block and the node loss) |
+| HA: **gRPC-Web through the ALB** (`LedgerService/GetServiceInfo`) | PASS: HTTP 200, `grpc-status:0`, chain `testnet`, server `sui-node/1.83.1` |
+| HA: native gRPC (HTTP/2) through the ALB | Fails, as documented (native gRPC must target instances directly) |
+| HA: unsupported AZ (us-east-1e) | PASS: Auto Scaling launched in other zones; nodes spread over 3 AZs, also after the replacement |
+| HA: reboot | PASS: out of rotation ~1.5 min; boot gate `skip`; `/data` mounted before `node.service`; data intact; not replaced (grace period) |
+| HA: node terminated | PASS: 2 nodes kept serving; replacement launched in 1.5 min and healthy ~3h30m later |
+| **Freshness gap** (plain `/health`) | Confirmed as documented: a node cut off from P2P stayed healthy in the ALB, with `/health` 200 and `?threshold_seconds=60` 503, for 13.5 minutes |
+| **Lag alarm** (stack-level `c1_seconds_behind`) | PASS after the fix for issue 5: fired ~8 min after the P2P block, cleared ~6 min after catch-up; also fired during each node's post-bootstrap catch-up (correct: those nodes were already receiving traffic) |
+| In-place upgrade tool | PASS: dry run, plan, SHA-256 verified install, restart, healthy and in sync 20 s later; refused a live HA instance |
+| **Never-downgrade safeguard** across a stop/start (stack still `v1.83.0`) | PASS: installer logged "testnet-v1.83.1 is installed (upgraded in place) and is newer than the requested v1.83.0; keeping it", and the node rebuilt and served on v1.83.1 |
+| Issue-2 fix on a real stop/start | PASS: `node.service` did not start before `/data` existed (0 restarts, no panic); started after `data.mount` |
+| Amazon Inspector package scan | Completed; see below |
+| CIS Ubuntu Level 1 benchmark (Amazon Inspector) | **Not completed**: the scan failed twice (the Inspector plugin exits with an error on these nodes and Inspector reports it as timed out), including on idle nodes |
+
+## Amazon Inspector results
+
+2,753 package findings per node, identical on all 4 nodes, all from the Ubuntu 24.04 image; none from the blueprint:
+- ~2,732 are Linux kernel CVEs (`linux-image-aws`) with **no fix available** from Ubuntu at the time (160 critical, 867
+  high, 50 medium, 1,655 untriaged).
+- ~20 have a fix available (brotli, bind9, libpcre2, apt, python-pip, python3-wheel, libmspack, python3-twisted).
+  `unattended-upgrades` is enabled on the image (11 security updates pending; next run the same morning), so these are
+  installed automatically. Kernel fixes also need a reboot, which keeps instance-store data.
+
+## Measurements
+
+| Measurement | Value |
+|---|---|
+| `cdk deploy` | 3.5-4 min |
+| Restore, successful attempt | 1h15m-1h50m (9 restores) |
+| Failed restore attempt (time lost) | 26-28 min each |
+| Index build | ~1h40m-1h50m |
+| Deploy to healthy (no failed attempt) | ~3h00m (HA1) |
+| `/data` used when in sync | ~390-400 GB of 3.4 TB |
+| In-place upgrade | 1m08s end to end; 20 s from restart to in sync |
+| Reboot to healthy (HA) | 2m43s |
+| Lag alarm, block to ALARM / recovery to OK | ~8 min / ~6 min |
+
+## Issues found
+
+| # | Symptom | Root cause | Fix | Retested |
+|---|---|---|---|---|
+| 4 | **4 of 6 first restore attempts failed** after 26-28 minutes with a checkpoint fetch timeout from `checkpoints.testnet.sui.io`, with traffic shaping **off** on every node. Each failure cost ~27 minutes. | Not traffic shaping (issue 1's conclusion was incomplete). Per `sui-tool`'s own source, the CPU-bound restore can starve its async runtime so that a single checkpoint fetch keeps timing out; after `--max-retries` (default 10, backoff capped at 30 s) the whole restore aborts. | Default `SUI_SNAPSHOT_MAX_RETRIES` raised from 10 to **50**, validated 0-1000 (ADR-0025, proposed). | Side experiment with 50: **3 of 3 first attempts succeeded** (1h15m-1h21m). Small sample; consistent with Sui's explanation. |
+| 5 | The documented lag alarm (1-minute periods, 5 evaluation periods) returned to **OK** while a node was ~78,000 s behind. | The sync checker runs every 60-90 s, so some 1-minute periods had no sample from the lagging node; the Maximum then came only from healthy nodes. The README also wrongly said bootstrapping nodes never trigger the alarm; they do during the post-bootstrap catch-up, correctly. | README command changed to 5-minute periods (`--period 300 --evaluation-periods 2 --datapoints-to-alarm 2`) and the wording corrected (ADR-0023 update). | Yes: the corrected alarm stayed in ALARM through a node's whole catch-up, fired on the P2P block and cleared after recovery. |
+
+Both fixes are verified locally (41/41 tests, all samples synthesize, ShellCheck clean); neither was redeployed.
+
+## Cost
+
+Estimated from instance runtimes (us-east-1 on-demand, prices re-checked 2026-11-05): 39 node-hours of
+`i7i.4xlarge` (~$59) plus root EBS, public IPv4, CloudWatch, testnet egress and the ALB (~$8), **~$67** in total: single
+node ~$15, HA ~$44, side experiment ~$8. Not reconciled with the bill.
+
+## Teardown
+
+Both stacks and the 3 experiment stacks destroyed; the test alarm, the CIS scan configuration and Amazon Inspector
+(enabled for EC2 only for this test) removed or disabled again. No instances, volumes, load balancers, alarms or
+dashboards remain. The CloudWatch agent's log groups were kept (7-day retention). The CDK bootstrap stack re-created for
+this test was kept.
+
+## Not yet tested (as of 2026-11-06)
+
+- Mainnet (bootstrap time, disk use against 3,750 GB, egress): modelled only.
+- An HA rolling upgrade (`cdk deploy` to a new version replacing nodes one at a time).
+- The CIS Ubuntu benchmark.
+- `SUI_SNAPSHOT_MAX_RETRIES=50` as a deployed default (tested only through `.env` in the side experiment).

@@ -49,14 +49,20 @@ esac
 mkdir -p "$DB_PATH"
 chown -R bcuser:bcuser /data/sui
 
-# sui-tool tuning. Defaults equal sui-tool's own (checked in v1.82.3, v1.83.0
-# and v1.83.1 source), so
-# behaviour only changes when set: --max-retries per HTTP request (default 10),
-# --num-parallel-downloads (default 50, sui-tool caps it at 200).
-MAX_RETRIES="${SUI_SNAPSHOT_MAX_RETRIES:-10}"
+# sui-tool tuning (ADR-0025).
+# --max-retries: retries per failed HTTP request, including the per-checkpoint
+#   fetches of the transaction-digest backfill, with exponential backoff capped
+#   at 30 s. sui-tool's own default is 10, which covers only a few minutes; while
+#   the CPU-bound restore starves sui-tool's async runtime, a single checkpoint
+#   fetch can keep timing out and then aborts the whole restore (sui-tool source,
+#   backfill_epoch_transaction_digests). In the 2026-11-06 release test 4 of 6
+#   first attempts failed this way with 10 and 3 of 3 succeeded with 50, so the
+#   blueprint defaults to 50. Validated as an integer from 0 to 1000.
+# --num-parallel-downloads: sui-tool's default 50; sui-tool caps it at 200.
+MAX_RETRIES="${SUI_SNAPSHOT_MAX_RETRIES:-50}"
 PARALLEL_DOWNLOADS="${SUI_SNAPSHOT_PARALLEL_DOWNLOADS:-50}"
-if ! printf '%s' "$MAX_RETRIES" | grep -Eq '^[0-9]+$'; then
-    log "ERROR: SUI_SNAPSHOT_MAX_RETRIES must be a non-negative integer (got '$MAX_RETRIES')" >&2
+if ! printf '%s' "$MAX_RETRIES" | grep -Eq '^[0-9]+$' || [ "$MAX_RETRIES" -gt 1000 ]; then
+    log "ERROR: SUI_SNAPSHOT_MAX_RETRIES must be an integer from 0 to 1000 (got '$MAX_RETRIES')" >&2
     exit 1
 fi
 if ! printf '%s' "$PARALLEL_DOWNLOADS" | grep -Eq '^[0-9]+$' \

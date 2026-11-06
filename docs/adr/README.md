@@ -8,7 +8,7 @@ existed. They were written retroactively, with the build agent as "Deciders", an
 Owner on 2026-11-05. Later changes get a new ADR or a dated update note; superseded ADRs are kept and marked
 `Superseded by ADR-NNNN`. Requirements references (R*n*) point to `.kiro/specs/sui-rpc-node-blueprint/requirements.md`.
 
-**Review status (2026-11-05):** all ADRs (0002-0024) have been reviewed and accepted by the Owner. ADRs 0003, 0005,
+**Review status (2026-11-06):** ADRs 0002-0024 have been reviewed and accepted by the Owner. **ADR-0025 (proposed during the release test) is pending Owner review.** ADRs 0003, 0005,
 0006, 0007, 0010, 0011, 0014, 0015 and 0016 carry dated `Update 2026-11-05` notes, accepted together with the original
 decision. Live verification is still pending for parts of 0020, 0022, 0023 and 0024 (release test); that does not
 change their acceptance.
@@ -39,3 +39,4 @@ change their acceptance.
 | [0022](0022-upgrade-strategy.md) | In-place upgrades for single nodes, rolling redeploys for HA, never-downgrade safeguard | Accepted (2026-11-05, decided by the Owner); live verification pending (release test) |
 | [0023](0023-health-check-and-lag-alarm.md) | Plain /health for the load balancer; stack-level lag alarm | Accepted by owner (2026-11-05, decided by the Owner); live verification pending (release test) |
 | [0024](0024-target-use-and-ha-sizing.md) | Intended use (applications in AWS) and 3-node HA for production | Accepted by owner (2026-11-05, decided by the Owner); HA live verification pending (release test) |
+| [0025](0025-snapshot-restore-retries.md) | Default 50 sui-tool retries for the snapshot restore | Proposed (2026-11-06), **pending Owner review** |

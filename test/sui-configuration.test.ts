@@ -273,7 +273,7 @@ describe('Sui Protocol Configuration', () => {
             const protocolConfig = configLoader.loadProtocolConfig('sui');
             const snapshot = fs.readFileSync(path.join(BLUEPRINT, 'user-data', 'common', 'download-snapshot.sh'), 'utf8');
 
-            expect(protocolConfig.customEnvVars).toEqual(expect.arrayContaining(['SUI_SNAPSHOT_MAX_RETRIES=10', 'SUI_SNAPSHOT_PARALLEL_DOWNLOADS=50']));
+            expect(protocolConfig.customEnvVars).toEqual(expect.arrayContaining(['SUI_SNAPSHOT_MAX_RETRIES=50', 'SUI_SNAPSHOT_PARALLEL_DOWNLOADS=50']));
             expect(snapshot).toContain('--max-retries "$MAX_RETRIES"');
             expect(snapshot).toContain('--num-parallel-downloads "$PARALLEL_DOWNLOADS"');
             expect(snapshot).toMatch(/\[ "\$PARALLEL_DOWNLOADS" -gt 200 \]/);

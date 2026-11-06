@@ -94,7 +94,7 @@ Decisions behind these requirements are recorded as ADRs in `docs/adr/`. Status 
 3. WHEN a database already exists at `/data/sui/db/live` THEN THE install phase SHALL skip the restore.
 4. IF the restore fails after 3 attempts THEN THE install phase SHALL exit non-zero, leaving no `live/` directory.
 5. WHEN `SNAPSHOT_ENABLED` is not `true` AND no database exists THEN THE install phase SHALL log a warning that the node will sync from genesis.
-6. THE `sui-tool` retry count and parallel downloads SHALL be configurable through `SUI_SNAPSHOT_MAX_RETRIES` and `SUI_SNAPSHOT_PARALLEL_DOWNLOADS`, default to `sui-tool`'s own defaults (10 and 50), and be validated (integer; parallel downloads 1-200) before use. *(Added 2026-11-03 after issue 1.)*
+6. THE `sui-tool` retry count and parallel downloads SHALL be configurable through `SUI_SNAPSHOT_MAX_RETRIES` and `SUI_SNAPSHOT_PARALLEL_DOWNLOADS`, default to 50 retries (raised from `sui-tool`'s own 10 on 2026-11-06 after issue 4; ADR-0025) and 50 parallel downloads, and be validated (retries 0-1000; parallel downloads 1-200) before use. *(Added 2026-11-03 after issue 1.)*
 
 ### Requirement 6: Node configuration
 
