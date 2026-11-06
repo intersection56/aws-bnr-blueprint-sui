@@ -1,0 +1,28 @@
+name: validate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    # Weekly, to catch breaking changes in aws-blockchain-node-runners main.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Install into Node Runners, test, and synth
+    runs-on: ubuntu-latest
+    steps:
+      # Pinned to commit SHAs (tags can be repointed); bump via Dependabot or by hand.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 20
+      - name: ShellCheck
+        run: find configurations user-data scripts -name '*.sh' -print0 | xargs -0 shellcheck -S warning
+      - name: Validate against aws-blockchain-node-runners main
+        run: bash scripts/validate.sh

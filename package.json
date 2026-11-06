@@ -1,0 +1,101 @@
+{
+  "name": "aws-bnr-blueprint-sui",
+  "version": "2.0.0",
+  "description": "Sui full node (RPC) runner for mainnet and testnet - runs the official MystenLabs sui-node release binary, restored from a verified formal snapshot, serving gRPC / gRPC-Web on a VPC-internal port",
+  "license": "Apache-2.0",
+  "author": "Ricardo Rodriguez <rrodriguez56@gmail.com> (https://github.com/intersection56)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/intersection56/aws-bnr-blueprint-sui.git"
+  },
+  "homepage": "https://github.com/intersection56/aws-bnr-blueprint-sui#readme",
+  "bugs": {
+    "url": "https://github.com/intersection56/aws-bnr-blueprint-sui/issues"
+  },
+  "keywords": [
+    "aws-blockchain-node-runners",
+    "aws-bnr-blueprint",
+    "sui",
+    "sui-node"
+  ],
+  "files": [
+    "configurations/",
+    "samples/",
+    "user-data/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "aws-blockchain-node-runners": ">=2.0.0"
+  },
+  "peerDependencies": {
+    "aws-blockchain-node-runners": ">=2.0.0"
+  },
+  "aws-blockchain-node-runner": {
+    "BLOCKCHAIN_PROTOCOL": "sui",
+    "supportedDeploymentModes": [
+      "single-node",
+      "ha-nodes"
+    ],
+    "defaultConfiguration": "sui-node-v1.83.1-full.sh",
+    "availableConfigurations": [
+      {
+        "name": "sui-node-v1.83.1-full.sh"
+      }
+    ],
+    "BC_NETWORKS": [
+      "mainnet",
+      "testnet"
+    ],
+    "defaultInstanceTypes": {
+      "x86_64": "i7i.4xlarge",
+      "ARM_64": "i8g.4xlarge"
+    },
+    "requiredPorts": [
+      {
+        "port": 9000,
+        "protocol": "tcp",
+        "description": "Sui RPC (gRPC, gRPC-Web, /health)",
+        "public": false
+      },
+      {
+        "port": 8084,
+        "protocol": "udp",
+        "description": "Sui P2P (state sync and peer discovery)",
+        "public": true
+      }
+    ],
+    "monitoring": {
+      "healthCheckPath": "/health",
+      "metricsPort": 9184,
+      "clientNames": [
+        "Sui Node"
+      ]
+    },
+    "storage": {
+      "defaultDataVolumes": [
+        {
+          "name": "data",
+          "sizeGiB": 3750,
+          "type": "instance-store",
+          "mountPath": "/data",
+          "fileSystem": "ext4"
+        }
+      ]
+    },
+    "snapshot": {
+      "enabled": true
+    },
+    "customEnvVarsNamePrefix": "SUI",
+    "customEnvVars": [
+      "SUI_ENABLE_INDEXING=true",
+      "SUI_NUM_EPOCHS_TO_RETAIN=5",
+      "SUI_NUM_EPOCHS_TO_RETAIN_FOR_CHECKPOINTS=2",
+      "SUI_ARCHIVE_FALLBACK=auto",
+      "SUI_RUST_LOG=info",
+      "SUI_SNAPSHOT_MAX_RETRIES=10",
+      "SUI_SNAPSHOT_PARALLEL_DOWNLOADS=50",
+      "SUI_ALLOW_DOWNGRADE=false"
+    ]
+  }
+}

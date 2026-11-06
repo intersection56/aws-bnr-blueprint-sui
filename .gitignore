@@ -1,0 +1,14 @@
+node_modules/
+cdk.out/
+.env
+cdk.context.json
+*.log
+.DS_Store
+
+# Deploy outputs and packaging artifacts
+deploy-output.json
+*.tgz
+
+# Editor settings
+.vscode/
+.idea/
