@@ -79,7 +79,7 @@ Status as of **2026-11-03 23:15 UTC**, after the redeploy test (node healthy and
 | 15.3 ShellCheck | all scripts | `shellcheck -S warning` clean | Verified (static) |
 | 15.4 CI pinned, least privilege | `.github/workflows/ci.yml` | ASH rerun clean; review | Verified (static) |
 | 16.1 Pre-deploy scans clean | - | ASH 0 findings after fixes; second secrets scanner 0 | Verified |
-| 16.2 Pre-publish scans | - | Commit `989cac1`, 2026-11-05: gitleaks 8.30.1 (history + files) 0 leaks; ASH 3.7.1 10 scanners 0 findings at every severity; both scanners caught a planted control finding; public write-up in `docs/security-scan-report.md` | Verified (threat model still open, task 29) |
+| 16.2 Pre-publish scans | - | Commit `55d2d64`, 2026-11-05: gitleaks 8.30.1 (history + files) 0 leaks; ASH 3.7.1 10 scanners 0 findings at every severity; both scanners caught a planted control finding; public write-up in `docs/security-scan-report.md` | Verified (threat model still open, task 29) |
 | 16.3 Live-instance scans | - | Not yet | Partly verified (live 2026-11-06): Amazon Inspector package scan (findings all OS-image, none from the blueprint) and network reachability (only 8084/udp); CIS benchmark not completed (Inspector scan failed twice) |
 | 16.4 No upload without consent | - | One scanner sent files to an AI service in the Owner's own AWS account despite its scan-only flag | **Partly met** (one scan; later scans must avoid it) |
 | 16.5 Inline suppressions with reasons | `install-sui-binaries.sh` | Review | Verified (static) |

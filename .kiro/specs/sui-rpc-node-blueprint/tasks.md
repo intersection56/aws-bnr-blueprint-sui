@@ -103,7 +103,7 @@ Phases 7-9 are the remaining work. Checkboxes: `[x]` done, `[ ]` open, `[~]` par
 - [x] 27. Answer the open questions in `requirements.md`: all answered (2026-11-05; cost ceiling not applicable and catalog submission confirmed 2026-11-09)
   - _Requirements: open questions_
 - [x] 28. `git init`, first commit; rerun ASH and a secrets scan over the history (gitleaks)
-  - Done 2026-11-05 on commit `989cac1` (clean clone): gitleaks 8.30.1 0 leaks (history and files; control finding caught); ASH 3.7.1 (`v3` = `af1206a`, container mode on Finch) 0 findings across 10 scanners at every severity (control finding caught by semgrep and opengrep); `validate.sh` 41/41 tests, 5/5 synth
+  - Done 2026-11-05 on commit `55d2d64` (clean clone): gitleaks 8.30.1 0 leaks (history and files; control finding caught); ASH 3.7.1 (`v3` = `af1206a`, container mode on Finch) 0 findings across 10 scanners at every severity (control finding caught by semgrep and opengrep); `validate.sh` 41/41 tests, 5/5 synth
   - _Requirements: 16.2_
 - [ ] 29. Threat model; any scan that uploads files to a remote service only with explicit consent
   - _Requirements: 16.2, 16.4_

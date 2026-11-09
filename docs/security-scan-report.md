@@ -9,11 +9,11 @@ release test. Requirement 16 in
 | Date | Scope | Result |
 |---|---|---|
 | 2026-11-02 | Working copy, before the first live test | 6 findings, all fixed; rerun clean |
-| 2026-11-05 | Commit `989cac1` (clean clone of exactly the committed files) and the git history | **No findings**; planted control findings were caught |
+| 2026-11-05 | Commit `55d2d64` (clean clone of exactly the committed files) and the git history | **No findings**; planted control findings were caught |
 
 ## 2026-11-05: first commit
 
-Scanned a clean clone of commit `989cac1` (54 files), so untracked local files were not part of the scan.
+Scanned a clean clone of commit `55d2d64` (54 files), so untracked local files were not part of the scan.
 
 | Tool | Version | What it checks | Result |
 |---|---|---|---|

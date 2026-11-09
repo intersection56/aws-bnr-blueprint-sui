@@ -195,7 +195,7 @@ To be reported upstream:
 
 ## Summary
 
-**Result: pass with issues.** Blueprint commit `0f34116` (sui-node v1.83.1), framework commit `2db9ea3`, testnet only
+**Result: pass with issues.** Blueprint commit `b08d6a1` (sui-node v1.83.1), framework commit `2db9ea3`, testnet only
 (Owner decision). A single-node stack and a 3-node HA stack ran in parallel. Every functional check passed, including
 the in-place upgrade, the never-downgrade safeguard across a stop/start, the issue-2 fix on a real stop/start, HA
 failover and replacement, and the lag alarm. Two issues were found and fixed in the blueprint (issues 4 and 5); one
