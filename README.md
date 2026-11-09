@@ -170,7 +170,7 @@ To use EBS instead (data survives stop/start, but costs more and is slower), set
 
 - **Inbound:** checkpoint data from peers, continuous because Sui produces several checkpoints per second. Inbound data transfer is not charged.
 - **Outbound:** state sync served to other peers on 8084/udp, plus any RPC responses to public IPs. This is billed as data transfer out to the internet. RPC to clients inside the VPC and same AZ is not charged; cross-AZ traffic is.
-- **Traffic shaping:** enabled in the samples (`TRAFFIC_SHAPING_RATE_MBIT="40"`). The limit is **off during bootstrap**: `node.sh` stops `net-rules.service` before the install phase, and `syncchecker.sh` keeps it off until `/data/init-completed` exists. (The framework starts the limit during setup, and in testing on 2026-11-03 two snapshot-restore attempts timed out with it on.) After bootstrap, `syncchecker.sh` removes the limit while the node is behind (more than `TRAFFIC_SHAPING_MAX_BLOCKS_BEHIND` checkpoints, or executed checkpoints older than 120 s) and applies it again once the node is in sync. With `TRAFFIC_SHAPING_ENABLED="false"` it keeps the limit off; the framework would otherwise leave it on. Only traffic to public IPs is shaped. VPC traffic, such as RPC to your clients, is not.
+- **Traffic shaping:** enabled in the samples (`TRAFFIC_SHAPING_RATE_MBIT="40"`). The limit is **off during bootstrap**: `node.sh` stops `net-rules.service` before the install phase, and `syncchecker.sh` keeps it off until `/data/init-completed` exists. (The framework starts the limit during setup. Two restore attempts timed out with it on in the 2026-11-03 test, but the 2026-11-06 release test showed shaping was not the root cause: restores also failed with it off, and the fix was more `sui-tool` retries, see ADR-0025 and [Troubleshooting](#troubleshooting). Keeping it off during bootstrap is harmless.) After bootstrap, `syncchecker.sh` removes the limit while the node is behind (more than `TRAFFIC_SHAPING_MAX_BLOCKS_BEHIND` checkpoints, or executed checkpoints older than 120 s) and applies it again once the node is in sync. With `TRAFFIC_SHAPING_ENABLED="false"` it keeps the limit off; the framework would otherwise leave it on. Only traffic to public IPs is shaped. VPC traffic, such as RPC to your clients, is not.
 
 **Outbound traffic estimate: how it was calculated.** Sui does not publish full node egress figures; the only published figure is a 1 Gbps network requirement. So the per-unit traffic below was **measured from real chain data** on 2026-11-02, and only the counts (peers, request rates, subscribers) are assumptions. Replace the assumptions with your measured `NetworkOut` after the first week.
 
@@ -442,19 +442,23 @@ For advanced options (HA mode, multiple stacks, maintenance), see the [Deploymen
 
 #### Step 4: Monitor Deployment
 
-`cdk deploy` returns before node setup finishes. Setup downloads the ~1.2 GB release archive, restores the latest formal snapshot, and then the node builds its gRPC indexes on first start. Measured on testnet with `i7i.4xlarge` (2026-11-03):
+`cdk deploy` returns before node setup finishes. Setup downloads the ~1.2 GB release archive, restores the latest formal snapshot, and then the node builds its gRPC indexes on first start. Measured on testnet with `i7i.4xlarge` (2026-11-03 and the 2026-11-06 release test, 10 bootstraps in total):
 
 | Phase | Testnet duration |
 |---|---|
-| `cdk deploy` | ~4 min |
+| `cdk deploy` | 3.5-4 min |
 | Release download and checksum | ~30 s |
 | Formal snapshot download (~105 GB) | ~6 min |
-| Snapshot verification and restore | ~1h40m |
-| gRPC index build (RPC and P2P ports closed until it finishes) | ~1h50m |
-| Catch-up to the chain tip | a few minutes |
-| **Deploy to healthy** | **~3h40m** |
+| Snapshot verification and restore (successful attempt) | 1h15m-1h50m |
+| gRPC index build (RPC and P2P ports closed until it finishes) | 1h40m-1h50m |
+| Catch-up to the chain tip | a few minutes to ~30 min (longer the older the snapshot epoch) |
+| **Deploy to healthy, no failed restore attempt** | **~3h00m-3h40m** |
+| Each failed restore attempt adds | ~26-28 min (it fails partway through; the next attempt starts automatically a minute later) |
+| **Deploy to healthy, one failed attempt** | **~4h-4h30m** |
 
-Mainnet has not been measured. Its database is several times larger (~2.5 TB for a pruned node with indexes, per Sui, Nov 2025, against ~0.4 TB on testnet), so expect a substantially longer bootstrap. A failed restore attempt adds its own duration again: each retry starts the download over.
+With the default of 50 `sui-tool` retries (ADR-0025), first attempts succeeded 3 of 3 times in testing; with `sui-tool`'s own default of 10, only 2 of 6 did. In the release test the snapshot files downloaded by a failed attempt were still on disk when the next attempt started, so a retry did not repeat the full download.
+
+Mainnet has not been measured. Its database is several times larger (~2.5 TB for a pruned node with indexes, per Sui, Nov 2025, against ~0.4 TB on testnet), so expect a substantially longer bootstrap.
 
 ```bash
 DASHBOARD_NAME=$(cat deploy-output.json | jq -r '..|.DashboardName? | select(. != null)')
@@ -564,7 +568,7 @@ Common causes:
 | `checksum mismatch` | Corrupted download or tampered asset | Redeploy. If it persists, check the release on GitHub. |
 | `genesis.blob checksum does not match` | Network was re-genesised (testnet) or the download was corrupted | Update the pinned checksum in `install-sui-binaries.sh` after verifying the new genesis upstream |
 | `formal snapshot restore failed` | Endpoint unreachable or out of disk | Check outbound internet access and `df -h /data`. Setup retries on the next boot. |
-| `Snapshot restore attempt N failed` after `Error performing GET https://checkpoints.<network>.sui.io/... operation timed out` | Requests to Sui's public checkpoint endpoint timing out. In testing this happened while traffic shaping was on during bootstrap | The blueprint now keeps shaping off during bootstrap. Each failed attempt re-downloads the snapshot, so check `systemctl is-active net-rules.service` (should be `inactive` until setup completes). If it persists, set `SUI_SNAPSHOT_PARALLEL_DOWNLOADS` lower (e.g. `20`) and redeploy |
+| `Snapshot restore attempt N failed` after `Error performing GET https://checkpoints.<network>.sui.io/... operation timed out` | A single checkpoint fetch ran out of `sui-tool` retries. The restore is CPU-bound and can starve `sui-tool`'s own network requests long enough for one fetch to keep timing out, which aborts the whole attempt (per `sui-tool`'s source; ADR-0025). Seen 26-28 minutes into an attempt, with and without traffic shaping | Usually nothing: setup retries automatically, up to 3 attempts a minute apart, and each failed attempt costs ~26-28 minutes. Check the effective setting in the log line `attempt N/3, parallel=..., max-retries=...` (the default is 50). If attempts keep failing, raise `SUI_SNAPSHOT_MAX_RETRIES` (for example `100`, maximum 1000) and redeploy. If all 3 attempts fail, setup runs again on the next boot: reboot the instance |
 | Node behind after restart | Catching up from the last executed checkpoint | Wait, or stop the node, remove `/data/sui/db` and redeploy to restore a fresh snapshot |
 | `Address already in use` | Another process on 9000/9184/8084 | Find it with `sudo ss -lntup` |
 
@@ -738,6 +742,7 @@ Bare metal is cheaper because bandwidth is included and you get more physical co
 - **Least privilege.** sui-node and sui-tool run as `bcuser`, not root, with `NoNewPrivileges=true`.
 - **No secrets.** A full node holds no funds or validator keys. `fullnode.yaml` contains no credentials. Mainnet archival fallback uses the instance role, never access keys.
 - No SSH. Use AWS Systems Manager Session Manager.
+- **OS patching.** The nodes run the framework's Ubuntu 24.04 image, where automatic security updates (`unattended-upgrades`) are on and install most fixes daily. **Kernel updates only take effect after a reboot**, which you schedule: a reboot keeps the instance-store data, and the node was serving again within ~3 minutes in testing. In HA, reboot one node at a time and wait for it to be healthy behind the load balancer before the next (the others keep serving). In the release test, Amazon Inspector reported vulnerabilities only in the operating-system image, mostly kernel CVEs that Ubuntu had not yet fixed, and none in the blueprint ([security scan report](docs/security-scan-report.md)).
 - **Scanned before publishing.** gitleaks (secrets, full history) and ASH (10 scanners, including semgrep, checkov, detect-secrets and cfn-nag) found nothing on the first commit; earlier findings were fixed. See the [security scan report](docs/security-scan-report.md). Live testing is in the [testnet test report](docs/testnet-test-report.md).
 
 ## FAQ
