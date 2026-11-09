@@ -386,6 +386,13 @@ npm install github:intersection56/aws-bnr-blueprint-sui --legacy-peer-deps
 npm install /path/to/aws-bnr-blueprint-sui --legacy-peer-deps --install-links
 ```
 
+If npm refuses with `EALLOWGIT` ("Fetching packages of type "git" have been disabled"), your npm version blocks git
+dependencies by default (npm 12 does). Allow it for this install only by adding `--allow-git=root`:
+
+```bash
+npm install github:intersection56/aws-bnr-blueprint-sui#v2.0.0 --legacy-peer-deps --allow-git=root
+```
+
 #### Step 1: Configure Environment
 
 ```bash
