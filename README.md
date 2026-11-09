@@ -759,6 +759,34 @@ A: No. Sui has deprecated JSON-RPC, and port 9000 on this release serves gRPC, g
 
 A: Only within the retention window, and only from the snapshot epoch onward. Formal snapshots don't include history. For older data, use Sui's Archival Service or an indexer.
 
+**Q: What happens to a transaction if a node fails or times out while handling it? Can my application move to another node?**
+
+A: Yes, and that's the recommended pattern, as long as the application **resends the exact same signed transaction**. A node doesn't hold transactions or keys: your application signs the transaction, and the node passes it to Sui's validators and returns the result. If the node hangs or fails mid-request, the transaction either never reached the validators, finalized anyway, or was accepted by some validators but not yet finalized. In all three cases the safe recovery is the same:
+
+1. **Build and sign once, and keep the signed bytes and the transaction digest** until you know the result.
+2. **On a timeout or connection error, first ask any node whether the digest executed** (`LedgerService/GetTransaction`). If it did, you're done.
+3. **If it didn't, resend the same signed bytes through another node**, with a backoff (for example 1 s, 2 s, 4 s) and a total deadline. Resending the same transaction is safe: Sui identifies it by its digest and either completes it or returns the result it already has.
+4. **Never build and sign a new transaction that uses the same owned objects** (such as the same gas coin) while the first one's outcome is unknown. Conflicting transactions on the same owned object can leave it locked until the next epoch, about a day ([Epochs](https://www.docs.sui.io/concepts/sui-architecture/epochs), [Object versioning](https://docs.sui.io/devnet/learn/object-package-versions)). For concurrent senders, give each worker its own gas coins, or use Mysten's [owned-object pools](https://github.com/MystenLabs/Sui_Owned_Object_Pools) or the SDK's transaction executors.
+5. **Optionally set an expiration epoch** on the transaction, so that after it passes you know the transaction can no longer execute.
+
+```text
+signed = sign(build(tx)); digest = digest_of(signed)
+for node in nodes:
+    try:   return node.execute(signed, timeout=10s)        # same bytes every time
+    except (timeout, connection error):
+        if any_node.get_transaction(digest) found: return it
+        sleep(backoff)                                      # then the next node, same bytes
+keep checking the digest                                     # outcome still unknown
+```
+
+How the application finds "another node" here:
+- **gRPC-Web through the HA internal load balancer:** the load balancer already sends requests to healthy nodes, so a plain retry usually reaches a different one.
+- **Native gRPC** (needed for streaming, or for clients without gRPC-Web): the application connects to instance IPs, so it must fail over itself. IPs change when a node is replaced, so refresh the list from the target group's healthy targets (`aws elbv2 describe-target-health`; the application's IAM role needs `elasticloadbalancing:DescribeTargetHealth`) or from the Auto Scaling group.
+- **Prefer nodes that are in sync** for building transactions: `GET /health?threshold_seconds=30` on a node returns 200 only when it is current. A transaction built from a lagging node's older object versions is rejected (not stuck) and needs a retry; see the freshness note in [High Availability (HA) Deployment](#high-availability-ha-deployment).
+- **Checkpoint streams** (`SubscribeCheckpoints`): record the last checkpoint processed and, after a disconnect, resume from it on another node.
+
+HA gives a retry somewhere to go; it doesn't make an unsafe retry safe. The rules above apply with one node or three, and to any Sui RPC endpoint.
+
 **Q: Why does each network need its own configuration file?**
 
 A: MystenLabs publishes per-network release binaries (`mainnet-vX`, `testnet-vX`). Testnet usually runs a newer version than mainnet.

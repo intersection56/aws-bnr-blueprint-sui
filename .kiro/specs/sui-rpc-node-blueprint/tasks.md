@@ -100,7 +100,7 @@ Phases 7-9 are the remaining work. Checkboxes: `[x]` done, `[ ]` open, `[~]` par
   - _Requirements: 2.7, 2.8, 8.5, 9.1-9.3, 10.5, 12.*, 16.3, 18_
 - [x] 26. Decide licence; align `LICENSE`, `package.json`, headers (Apache-2.0, aligned with the community blueprints; ADR-0018). Copyright holder confirmed by the Owner 2026-11-05
   - _Requirements: 17.1, 17.2_
-- [~] 27. Answer the open questions in `requirements.md`: answered 2026-11-05 except the monthly cost ceiling and confirmation of the catalog submission
+- [x] 27. Answer the open questions in `requirements.md`: all answered (2026-11-05; cost ceiling not applicable and catalog submission confirmed 2026-11-09)
   - _Requirements: open questions_
 - [x] 28. `git init`, first commit; rerun ASH and a secrets scan over the history (gitleaks)
   - Done 2026-11-05 on commit `989cac1` (clean clone): gitleaks 8.30.1 0 leaks (history and files; control finding caught); ASH 3.7.1 (`v3` = `af1206a`, container mode on Finch) 0 findings across 10 scanners at every severity (control finding caught by semgrep and opengrep); `validate.sh` 41/41 tests, 5/5 synth

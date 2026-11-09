@@ -257,16 +257,17 @@ Answered 2026-11-05 (decisions by the Owner unless marked; reasoning in ADRs 001
    a single node is for development, testing or non-critical use (ADR-0024).
 2. **Single-node recovery time:** accepted as hours after a stop/start (instance store; measured 3h43m on testnet).
    Upgrades avoid it with in-place upgrades over SSM (minutes) and the never-downgrade safeguard (ADR-0022).
-3. **Monthly cost ceiling:** **still open.** For reference: single node ~$1,605, 3-node HA ~$4,830 on-demand
-   (~$3,050 with a 3-year EC2 Instance Savings Plan), us-east-1, prices as of 2026-11-02.
+3. **Monthly cost ceiling:** **not applicable** (Owner decision 2026-11-09): the blueprint sets no cost ceiling; the
+   README documents costs instead (single node ~$1,605, 3-node HA ~$4,830 on-demand, ~$3,050 with a 3-year EC2
+   Instance Savings Plan, us-east-1, prices as of 2026-11-02).
 4. **Upgrade cadence** (from Mysten Labs, https://docs.sui.io/operators/full-node/updates): apply every release for
    the network (testnet every Tuesday, mainnet every second Wednesday); releases with a protocol change must be
    installed before activation. The release watch runs daily.
 5. **Licence and copyright holder:** Apache-2.0, aligned with the community blueprints; copyright holder confirmed by
    the Owner under Amazon's open-source process (ADR-0018).
 6. **Publishing target:** public GitHub repository `intersection56/aws-bnr-blueprint-sui` (install with
-   `npm install github:intersection56/aws-bnr-blueprint-sui --legacy-peer-deps`). Catalog submission: planned after
-   the release test (not yet confirmed by the Owner).
+   `npm install github:intersection56/aws-bnr-blueprint-sui --legacy-peer-deps`). Catalog submission: **confirmed**
+   by the Owner (2026-11-09).
 7. **Supported regions:** us-east-1 tested; North American regions recommended by default, because Mysten Labs' free
    formal-snapshot bucket is in North America only (agent recommendation from Mysten's docs).
 8. **Release test scope** (added): testnet only, single node and 3-node HA (scenario A). Mainnet is not tested before publishing (Owner decision 2026-11-05).
