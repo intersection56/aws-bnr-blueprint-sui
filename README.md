@@ -134,7 +134,7 @@ Sui's suggested minimum for a full node is 8 physical cores (16 vCPU), 128 GB RA
 
 ### Regions
 
-- **Tested:** us-east-1 (testnet, 2026-11-03). Prices in this README are for us-east-1.
+- **Tested:** us-east-1 (testnet: 2026-11-03 single node; 2026-11-06 single node and 3-node HA, [test report](docs/testnet-test-report.md)). Prices in this README are for us-east-1.
 - **Default recommendation: a North American region.** Mysten Labs' free formal-snapshot bucket, which every new or replacement node restores from, is currently hosted in North America only ([Available data stores](https://docs.sui.io/operators/data-management/available-data-stores)). Elsewhere, expect slower bootstrap (not measured), or use Mysten's Requester Pays S3 snapshot buckets, which needs code changes this blueprint doesn't include.
 - `i7i` and `i8g` are not offered in every region or Availability Zone (for example, `i7i.4xlarge` is not offered in us-east-1e). Set `AWS_AZ` for single-node stacks if a deploy fails with insufficient capacity.
 
