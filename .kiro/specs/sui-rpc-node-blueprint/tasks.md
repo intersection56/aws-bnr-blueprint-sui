@@ -109,7 +109,7 @@ Phases 7-9 are the remaining work. Checkboxes: `[x]` done, `[ ]` open, `[~]` par
   - _Requirements: 16.2, 16.4_
 - [ ] 30. Consider systemd sandboxing for `node.service` once write paths are confirmed
   - _Requirements: 8.2 (hardening)_
-- [~] 31. Replace `<org>` placeholders (done 2026-11-05: `intersection56`; `package.json` `author`/`repository`/`homepage`/`bugs`); publish to GitHub; tag the release (`v2.0.0`, matching `package.json`); submit for the community catalog
+- [~] 31. Replace `<org>` placeholders (done 2026-11-05: `intersection56`; `package.json` `author`/`repository`/`homepage`/`bugs`); published to GitHub and tagged `v2.0.0` (2026-11-09; CI passing; GitHub install and `cdk synth` of all samples verified); submit for the community catalog (Issue in the Node Runners repo) still open
   - _Requirements: 1.1_
 
 ## Phase 9: Optional
